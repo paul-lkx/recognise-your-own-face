@@ -1,6 +1,8 @@
-#include<opencv2\opencv.hpp>  
-#include<opencv2\face.hpp>
-#include<iostream>  
+#include<opencv2/opencv.hpp>
+#include<opencv2/face.hpp>
+#include "opencv2/core.hpp"
+#include "opencv2/face/facerec.hpp"
+#include<iostream>
 
 using namespace std;
 using namespace cv;
@@ -22,10 +24,10 @@ int main()
 	//训练好的文件名称，放置在可执行文件同目录下  
 	cascade.load("lbpcascade_frontalface.xml");
 
-	Ptr<FaceRecognizer> modelPCA = createEigenFaceRecognizer();
+	Ptr<FaceRecognizer> modelPCA = EigenFaceRecognizer::create();
 	modelPCA->load("MyFacePCAModel.xml");
 
-	while (1)
+	while (!stop)
 	{
 		cap >> frame;
 
@@ -84,7 +86,15 @@ int main()
 		}
 
 		imshow("face", frame);
-		waitKey(200);
+		char key = waitKey(200);
+
+        switch (key) {
+            case'Esc':
+                break;
+            default:
+                continue;
+        }
+
 	}
 
 	return 0;

@@ -1,12 +1,11 @@
-#include<opencv2\face\facerec.hpp>
-#include<opencv2\core.hpp>
-#include<opencv2\face.hpp>
-#include<opencv2\highgui.hpp>
-#include<opencv2\imgproc.hpp>
+#include "opencv2/face/facerec.hpp"
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
+#include "opencv2/core.hpp"
 #include <iostream>  
-#include <fstream>  
-#include <sstream>  
-#include <math.h>  
+#include <fstream>
+#include "sstream"
+
 
 using namespace cv;
 using namespace cv::face;
@@ -30,46 +29,65 @@ static Mat norm_0_255(InputArray _src) {
 	return dst;
 }
 
-//使用CSV文件去读图像和标签，主要使用stringstream和getline方法  
-static void read_csv(const string& filename, vector<Mat>& images, vector<int>& labels, char separator = ';') {
-	std::ifstream file(filename.c_str(), ifstream::in);
-	if (!file) {
-		string error_message = "No valid input file was given, please check the given filename.";
-		CV_Error(CV_StsBadArg, error_message);
-	}
-	string line, path, classlabel;
-	while (getline(file, line)) {
-		stringstream liness(line);
-		getline(liness, path, separator);
-		getline(liness, classlabel);
-		if (!path.empty() && !classlabel.empty()) {
-			images.push_back(imread(path, 0));
-			labels.push_back(atoi(classlabel.c_str()));
-		}
-	}
+
+static void read_csv(const string& filename, vector<Mat>& images,
+                     vector<int>& labels, std::map<int, string>& labelsInfo, char separator = ';') {
+    ifstream csv(filename.c_str());
+    if (!csv) CV_Error(Error::StsBadArg, "No valid input file was given, please check the given filename.");
+    string line, path, classlabel, info;
+    while (getline(csv, line)) {
+        stringstream liness(line);
+        path.clear(); classlabel.clear(); info.clear();
+        getline(liness, path, separator);
+        getline(liness, classlabel, separator);
+        getline(liness, info, separator);
+        if(!path.empty() && !classlabel.empty()) {
+            cout << "Processing " << path << endl;
+            int label = atoi(classlabel.c_str());
+            if(!info.empty())
+                labelsInfo.insert(std::make_pair(label, info));
+            // 'path' can be file, dir or wildcard path
+            String root(path.c_str());
+            vector<String> files;
+            glob(root, files, true);
+            for(vector<String>::const_iterator f = files.begin(); f != files.end(); ++f) {
+                cout << "\t" << *f << endl;
+                Mat img = imread(*f, IMREAD_GRAYSCALE);
+                static int w=-1, h=-1;
+                static bool showSmallSizeWarning = true;
+                if(w>0 && h>0 && (w!=img.cols || h!=img.rows)) cout << "\t* Warning: images should be of the same size!" << endl;
+                if(showSmallSizeWarning && (img.cols<50 || img.rows<50)) {
+                    cout << "* Warning: for better results images should be not smaller than 50x50!" << endl;
+                    showSmallSizeWarning = false;
+                }
+                images.push_back(img);
+                labels.push_back(label);
+            }
+        }
+    }
 }
 
-
-int main()
-{
+int main() {
 
 	//读取你的CSV文件路径.  
 	//string fn_csv = string(argv[1]);  
-	string fn_csv = "at.txt";
+	string fn_csv = "../at.txt";
 
 	// 2个容器来存放图像数据和对应的标签  
 	vector<Mat> images;
 	vector<int> labels;
+    std::map <int, string> labelsInfo;
 	// 读取数据. 如果文件不合法就会出错  
 	// 输入的文件名已经有了.  
 	try
 	{
-		read_csv(fn_csv, images, labels);
+        read_csv(fn_csv, images, labels, labelsInfo);
+//        std::cout << images.size() << std::endl;
 	}
 	catch (cv::Exception& e)
 	{
 		cerr << "Error opening file \"" << fn_csv << "\". Reason: " << e.msg << endl;
-		// 文件有问题，我们啥也做不了了，退出了  
+		// 文件有问题，我们啥也做不了了，退出了
 		exit(1);
 	}
 	// 如果没有读取到足够图片，也退出.  
@@ -96,15 +114,15 @@ int main()
 	// 如果你使用所有特征并且使用一个阈值，使用以下语句：  
 	//      cv::createEigenFaceRecognizer(0, 123.0);  
 
-	Ptr<BasicFaceRecognizer> model = createEigenFaceRecognizer();
+	Ptr<EigenFaceRecognizer> model = EigenFaceRecognizer::create();
 	model->train(images, labels);
 	model->save("MyFacePCAModel.xml");
 
-	Ptr<BasicFaceRecognizer> model1 = createFisherFaceRecognizer();
+	Ptr<FisherFaceRecognizer> model1 = FisherFaceRecognizer::create();
 	model1->train(images, labels);
 	model1->save("MyFaceFisherModel.xml");
 
-	Ptr<LBPHFaceRecognizer> model2 = createLBPHFaceRecognizer();
+	Ptr<LBPHFaceRecognizer> model2 = LBPHFaceRecognizer::create();
 	model2->train(images, labels);
 	model2->save("MyFaceLBPHModel.xml");
 
